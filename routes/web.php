@@ -187,11 +187,13 @@ Route::middleware('auth')->group(function () {
     // Questions (Input Pertanyaan)
     Route::get('/questions', [QuestionController::class, 'index'])->name('questions.index');
     Route::get('/questions/create', [QuestionController::class, 'create'])->name('questions.create');
+    Route::get('/questions/check-new', [QuestionController::class, 'checkNew'])->name('questions.checkNew');
     Route::post('/questions', [QuestionController::class, 'store'])->name('questions.store');
     Route::get('/questions/{question}', [QuestionController::class, 'show'])->name('questions.show');
     Route::get('/questions/{question}/detail', [QuestionController::class, 'detail'])->name('questions.detail');
     Route::get('/questions/{question}/edit', [QuestionController::class, 'edit'])->name('questions.edit');
     Route::patch('/questions/{question}', [QuestionController::class, 'update'])->name('questions.update');
+    Route::patch('/questions/{question}/mark-replied', [QuestionController::class, 'markReplied'])->name('questions.markReplied');
     Route::delete('/questions/{question}', [QuestionController::class, 'destroy'])->name('questions.destroy');
 
     // Categories (Kategori Layanan)

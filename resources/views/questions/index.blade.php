@@ -141,6 +141,10 @@
             </div>
         </div>
     </div>
+    {{-- Badge Notifikasi Data Baru (Polling) --}}
+    <div id="new-data-badge" class="hidden fixed top-6 right-6 bg-indigo-600 text-white px-5 py-3.5 rounded-2xl shadow-2xl cursor-pointer z-[70] font-bold text-sm animate-bounce" onclick="location.reload()">
+        <span id="new-data-count"></span> pertanyaan baru masuk. Klik untuk refresh.
+    </div>
 
     {{-- 5. MODALS SECTION --}}
     
@@ -273,6 +277,25 @@
                 if (e.target == detailModal) hideModal(detailModal);
                 if (e.target == deleteModal) hideModal(deleteModal);
             }
+
+            // Polling: cek data baru setiap 10 detik
+            const lastQuestionId = {{ $questions->max('id') ?? 0 }};
+            const newDataBadge = document.getElementById('new-data-badge');
+            const newDataCount = document.getElementById('new-data-count');
+
+            setInterval(async () => {
+                try {
+                    const response = await fetch(`{{ route('questions.checkNew') }}?last_id=${lastQuestionId}`);
+                    const data = await response.json();
+
+                    if (data.hasNew) {
+                        newDataCount.textContent = data.count;
+                        newDataBadge.classList.remove('hidden');
+                    }
+                } catch (error) {
+                    console.error('Gagal cek data baru:', error);
+                }
+            }, 10000);
         });
     </script>
 </x-app-layout>

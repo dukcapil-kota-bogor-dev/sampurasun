@@ -74,18 +74,18 @@ class WhatsappWebhookController extends Controller
         $data = $this->parseTemplate($text);
 
         if (!$data) {
-            // Format tidak cocok / belum lengkap, jangan disimpan dulu.
-            // (Di sini nanti kamu bisa tambahkan logic auto-reply
-            // "Mohon isi ulang sesuai format" via Cloud API.)
             return response()->json(['status' => 'format_tidak_sesuai']);
         }
 
         // Cari kategori berdasarkan nama layanan yang diketik warga
         $category = Category::where('name', 'like', $data['layanan'])->first();
 
-        Question::create([
-            'tanggal' => now()->toDateString(),
+        $question = Question::updateOrCreate(
+        [
             'nik' => $data['nik'],
+            'tanggal' => now()->toDateString()
+        ],
+        [
             'nama' => $data['nama'],
             'no_hp' => $from,
             'jenis_kelamin' => $this->normalizeGender($data['jenis_kelamin']),
@@ -94,31 +94,34 @@ class WhatsappWebhookController extends Controller
             'jenis_layanan_id' => $category?->id,
             'detail' => $data['keluhan'] ?? null,
             'jam_masuk' => now()->format('H:i'),
-            'jam_di_balasan' => null, // diisi operator nanti pas kasih solusi
+            //'jam_di_balasan' => null, // diisi operator nanti pas kasih solusi
         ]);
 
         return response()->json(['status' => 'saved']);
     }
 
-    /**
-     * Parsing sederhana berbasis label "Key: Value" per baris.
-     * Return null kalau field wajib belum lengkap.
-     */
+    
     private function parseTemplate(string $text): ?array
     {
         $lines = explode("\n", $text);
         $result = [];
 
+        $validKeys = ['nama', 'nik', 'jenis kelamin', 'kecamatan', 'kelurahan', 'layanan', 'keluhan'];
+
         foreach ($lines as $line) {
             if (str_contains($line, ':')) {
                 [$key, $value] = explode(':', $line, 2);
                 $key = strtolower(trim($key));
+                $key = preg_replace('/[^a-z ]/', '', $key); // normalisasi key: hapus spasi & karakter aneh
                 $value = trim($value);
-                $result[$key] = $value;
+
+                if (in_array($key, $validKeys) && !isset($result[$key])) {
+                    $result[$key] = $value;
+                }
             }
         }
 
-        // Mapping nama field template -> nama field yang dipakai internal
+        
         $mapped = [
             'nama' => $result['nama'] ?? null,
             'nik' => $result['nik'] ?? null,
@@ -129,7 +132,7 @@ class WhatsappWebhookController extends Controller
             'keluhan' => $result['keluhan'] ?? null,
         ];
 
-        // Field wajib sesuai validasi di QuestionController::store()
+        
         if (!$mapped['nama'] || !$mapped['nik'] || !$mapped['jenis_kelamin']) {
             return null;
         }
@@ -137,10 +140,7 @@ class WhatsappWebhookController extends Controller
         return $mapped;
     }
 
-    /**
-     * Normalisasi jawaban jenis kelamin dari warga (L/l/laki/dst)
-     * ke format persis yang divalidasi QuestionController: 'Laki-laki' / 'Perempuan'.
-     */
+   
     private function normalizeGender(string $raw): string
     {
         $raw = strtolower(trim($raw));
@@ -153,8 +153,7 @@ class WhatsappWebhookController extends Controller
             return 'Perempuan';
         }
 
-        // Default aman kalau tidak dikenali, supaya tidak lolos validasi diam-diam.
-        // Nanti bisa ditingkatkan: reject & minta warga isi ulang.
+        
         return $raw;
     }
 }

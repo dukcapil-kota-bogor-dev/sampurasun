@@ -249,4 +249,27 @@ class QuestionController extends Controller
         $question->delete();
         return redirect()->route('questions.index')->with('status', 'Pertanyaan berhasil dihapus.');
     }
+
+    public function markReplied(Question $question)
+    {
+        $question->update([
+            'jam_di_balasan' => now()->format('H:i'),
+        ]);
+        return redirect()->back()->with('status', 'Waktu balasan berhasil dicatat.');
+    }
+
+    public function checkNew(Request $request)
+    {
+    $lastId = (int) $request->query('last_id', 0);
+
+    $hasNew = Question::where('id', '>', $lastId)->exists();
+    $newCount = Question::where('id', '>', $lastId)->count();
+
+    return response()->json([
+        'hasNew' => $hasNew,
+        'count' => $newCount,
+    ]);
+    }
+
+    
 }

@@ -83,4 +83,15 @@
             </div>
         </div>
     </div>
+    @if(empty($question->jam_di_balasan))
+        <div class="mt-4">
+            <form method="POST" action="{{ route('questions.markReplied', $question) }}">
+                @csrf
+                @method('PATCH')
+                <button type="submit" class="w-full md:w-auto px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold rounded-lg transition">
+                    Tandai Sudah Dibalas
+                </button>
+            </form>
+        </div>
+    @endif
 </div>
