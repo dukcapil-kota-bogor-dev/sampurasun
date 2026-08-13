@@ -78,21 +78,28 @@ class WhatsappWebhookController extends Controller
         }
 
         // Cari kategori berdasarkan nama layanan yang diketik warga
-        $category = Category::where('name', 'like', $data['layanan'])->first();
+       
+
+        $layananInput = trim($data['layanan']);
+        $category = Category::all()->first(function ($cat) use ($layananInput) {
+            return stripos($layananInput, $cat->name) !== false;
+        });
+
+        $nikClean = preg_replace('/[^0-9]/', '', $data['nik']); // Hanya ambil angka dari NIK
 
         $question = Question::updateOrCreate(
         [
-            'nik' => $data['nik'],
+            'nik' => $nikClean,
             'tanggal' => now()->toDateString()
         ],
         [
-            'nama' => $data['nama'],
+            'nama' => trim($data['nama']),
             'no_hp' => $from,
             'jenis_kelamin' => $this->normalizeGender($data['jenis_kelamin']),
-            'kecamatan' => $data['kecamatan'] ?? null,
-            'kelurahan' => $data['kelurahan'] ?? null,
+            'kecamatan' => trim($data['kecamatan']) ?? '',
+            'kelurahan' => trim($data['kelurahan']) ?? '',
             'jenis_layanan_id' => $category?->id,
-            'detail' => $data['keluhan'] ?? null,
+            'detail' => trim($data['keluhan']) ?? '',
             'jam_masuk' => now()->format('H:i'),
             //'jam_di_balasan' => null, // diisi operator nanti pas kasih solusi
         ]);
@@ -144,16 +151,22 @@ class WhatsappWebhookController extends Controller
     private function normalizeGender(string $raw): string
     {
         $raw = strtolower(trim($raw));
+        $raw = preg_replace('/\s+/', '', $raw);
+        $raw = str_replace('-', ' ', $raw);
 
-        if (in_array($raw, ['l', 'laki', 'laki-laki', 'pria'])) {
-            return 'Laki-laki';
-        }
 
-        if (in_array($raw, ['p', 'perempuan', 'wanita'])) {
-            return 'Perempuan';
-        }
 
-        
-        return $raw;
+        $lakiVariasi = ['l', 'lk', 'laki', 'laki laki', 'pria', 'cowok', 'cowo'];
+    $perempuanVariasi = ['p', 'pr', 'perempuan', 'wanita', 'cewek', 'cewe'];
+
+    if (in_array($raw, $lakiVariasi)) {
+        return 'Laki-laki';
     }
+
+    if (in_array($raw, $perempuanVariasi)) {
+        return 'Perempuan';
+    }
+
+    return $raw; // fallback, biar ketauan kalau ada yang belum ke-cover
+}
 }
