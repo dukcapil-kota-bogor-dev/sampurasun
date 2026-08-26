@@ -74,9 +74,7 @@ class QuestionController extends Controller
 
         // Order: tanggal ascending (terlama paling atas), lalu jam_masuk ascending
         // Agar jam kosong (NULL) berada di bawah, prioritaskan non-null dulu.
-        $query->orderBy('tanggal', 'asc')
-            ->orderByRaw("CASE WHEN jam_masuk IS NULL THEN 1 ELSE 0 END ASC")
-            ->orderBy('jam_masuk', 'asc');
+        $query->orderBy('id', 'desc');
 
         $questions = $query->paginate(15)->appends($request->only('q', 'date', 'month', 'year', 'day'));
 
