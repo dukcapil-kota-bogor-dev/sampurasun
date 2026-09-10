@@ -35,6 +35,18 @@
                     <form action="{{ route('questions.store') }}" method="POST" class="mt-2"> 
                         @csrf
 
+                    {{-- Kotak Tempel Chat WhatsApp --}}
+                    <div class="mb-6 p-4 bg-indigo-50 border border-indigo-100 rounded-xl">
+                        <label class="block text-[10px] font-black text-indigo-600 uppercase tracking-widest mb-2">
+                            Tempel Chat WhatsApp Warga (Opsional)
+                        </label>
+                        <textarea id="waste_paste" rows="6" placeholder="Salin (copy) balasan template dari warga di WhatsApp, lalu paste (tempel) di sini..." class="block w-full rounded-xl border-indigo-200 shadow-sm focus:ring-indigo-500 focus:border-indigo-500 text-sm py-2.5"></textarea>
+                        <button type="button" id="btn_auto_fill" class="mt-3 inline-flex items-center px-6 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold uppercase tracking-widest rounded-xl transition active:scale-95">
+                            Isi Otomatis dari Chat
+                        </button>
+                        <p id="auto_fill_status" class="mt-2 text-xs font-semibold"></p>
+                    </div>
+
                         <div class="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-4"> 
                             {{-- Baris 1: Tanggal & NIK --}}
                             <div class="space-y-1">
@@ -189,6 +201,130 @@
                 kelSelect.value = oldKel;
             }
         }
+
+        // ===== Logic Parsing & Auto-fill dari Chat WhatsApp =====
+        function normalizeGenderJS(raw) {
+            raw = raw.toLowerCase().trim().replace(/\s+/g, ' ').replace(/-/g, ' ');
+            const lakiVariasi = ['l', 'lk', 'laki', 'laki laki', 'pria', 'cowok', 'cowo'];
+            const perempuanVariasi = ['p', 'pr', 'perempuan', 'wanita', 'cewek', 'cewe'];
+            if (lakiVariasi.includes(raw)) return 'Laki-laki';
+            if (perempuanVariasi.includes(raw)) return 'Perempuan';
+            return raw;
+        }
+
+        function parseWaTemplate(text) {
+            const lines = text.split('\n');
+            const validKeys = ['nama', 'nik', 'no hp', 'no hpwhatsapp', 'jenis kelamin', 'kecamatan', 'kelurahan', 'layanan', 'keluhan'];
+            const result = {};
+
+            lines.forEach(function(line) {
+                if (line.includes(':')) {
+                    const idx = line.indexOf(':');
+                    let key = line.substring(0, idx).toLowerCase().trim();
+                    key = key.replace(/[^a-z ]/g, '');
+                    const value = line.substring(idx + 1).trim();
+
+                    if (validKeys.includes(key) && !(key in result)) {
+                        result[key] = value;
+                    }
+                }
+            });
+
+            return result;
+        }
+
+        function findMatchingOption(selectEl, searchText) {
+            if (!searchText) return null;
+            const search = searchText.toLowerCase();
+            const options = Array.from(selectEl.options);
+            const found = options.find(opt => opt.value && opt.value.toLowerCase() === search);
+            if (found) return found.value;
+            const partial = options.find(opt => opt.value && (
+                search.includes(opt.value.toLowerCase()) || opt.value.toLowerCase().includes(search)
+            ));
+            return partial ? partial.value : null;
+        }
+
+        function findMatchingCategoryOption(selectEl, searchText) {
+            if (!searchText) return null;
+            const search = searchText.toLowerCase();
+            const options = Array.from(selectEl.options);
+            const found = options.find(opt => opt.textContent && search.includes(opt.textContent.trim().toLowerCase()));
+            return found ? found.value : null;
+        }
+
+        document.getElementById('btn_auto_fill').addEventListener('click', function() {
+            const text = document.getElementById('waste_paste').value;
+            const statusEl = document.getElementById('auto_fill_status');
+
+            if (!text.trim()) {
+                statusEl.textContent = 'Kotak chat masih kosong.';
+                statusEl.className = 'mt-2 text-xs font-semibold text-rose-600';
+                return;
+            }
+
+            const data = parseWaTemplate(text);
+            let filledCount = 0;
+
+            if (data['nama']) {
+                document.querySelector('[name="nama"]').value = data['nama'];
+                filledCount++;
+            }
+            if (data['nik']) {
+                document.querySelector('[name="nik"]').value = data['nik'].replace(/[^0-9]/g, '');
+                filledCount++;
+            }
+                        if (data['no hp'] || data['no hpwhatsapp']) {
+                const noHpValue = data['no hp'] || data['no hpwhatsapp'];
+                document.querySelector('[name="no_hp"]').value = noHpValue.replace(/[^0-9]/g, '');
+                filledCount++;
+            }
+            if (data['jenis kelamin']) {
+                document.querySelector('[name="jenis_kelamin"]').value = normalizeGenderJS(data['jenis kelamin']);
+                filledCount++;
+            }
+            if (data['kecamatan']) {
+                const match = findMatchingOption(kecSelect, data['kecamatan']);
+                if (match) {
+                    kecSelect.value = match;
+                    populateKelurahan(match);
+                    filledCount++;
+
+                    if (data['kelurahan']) {
+                        const kelMatch = findMatchingOption(kelSelect, data['kelurahan']);
+                        if (kelMatch) {
+                            kelSelect.value = kelMatch;
+                            filledCount++;
+                        }
+                    }
+                }
+            }
+            if (data['layanan']) {
+                const layananSelect = document.querySelector('[name="jenis_layanan"]');
+                const match = findMatchingCategoryOption(layananSelect, data['layanan']);
+                if (match) {
+                    layananSelect.value = match;
+                    filledCount++;
+                }
+            }
+            if (data['keluhan']) {
+                document.querySelector('[name="detail"]').value = data['keluhan'];
+                filledCount++;
+            }
+
+            // Isi tanggal & jam masuk otomatis kalau masih kosong
+            const tanggalInput = document.querySelector('[name="tanggal"]');
+            if (!tanggalInput.value) {
+                tanggalInput.value = new Date().toISOString().split('T')[0];
+            }
+            if (jamMasuk && !jamMasuk.value) {
+                const now = new Date();
+                jamMasuk.value = String(now.getHours()).padStart(2, '0') + ':' + String(now.getMinutes()).padStart(2, '0');
+            }
+
+            statusEl.textContent = filledCount + ' field berhasil diisi otomatis. Silakan periksa sebelum menyimpan.';
+            statusEl.className = 'mt-2 text-xs font-semibold text-emerald-600';
+        });
 
         document.addEventListener('DOMContentLoaded', function() {
             populateKecamatan();
